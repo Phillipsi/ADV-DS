@@ -1,0 +1,295 @@
+//Phillip Si
+//Graphics-Asg1: Bouncing Shapes
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import javax.swing.*;
+
+public class Soccer_Game_SiHoldenLee {
+   public static void main(String[] args) {
+      int n = Integer.parseInt(JOptionPane.showInputDialog("Pleas input the number of balls:"));
+      javax.swing.SwingUtilities.invokeLater(new Runnable() {
+         public void run() {
+            JFrame frame = new JFrame(n+" Bouncing Balls");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setContentPane(new BoxOfBalls(2000, 1400, n));
+            frame.pack(); //size
+            frame.setVisible(true);
+         }
+      });
+   }
+}
+
+/**
+ * The rectangular container 
+ */
+class Box {
+   int minX, maxX, minY, maxY; // bounds
+   private Color fillColor; // background
+   private Color borderColor; // Box's border color
+   
+   /** Constructors */
+   public Box(int x, int y, int width, int height, Color fillColor, Color borderColor) {
+      minX = x;
+      minY = y;
+      maxX = x + width - 1;
+      maxY = y + height - 1;
+      this.fillColor = fillColor;
+      this.borderColor = borderColor;
+   }
+   
+   /** Set or reset the boundaries of the box. */
+   public void set(int x, int y, int width, int height) {
+      minX = x;                   
+      minY = y;
+      maxX = x + width - 1;
+      maxY = y + height - 1;
+   }
+
+   /** Draw itself using the given graphic context. */
+   public void draw(Graphics g) {
+      g.setColor(fillColor);
+      g.fillRect(minX, minY, maxX - minX - 1, maxY - minY - 1);
+      g.setColor(borderColor);
+      g.drawRect(minX, minY, maxX - minX - 1, maxY - minY - 1);
+   }
+}
+
+class BoxOfBalls extends JPanel {
+   private static final int rate = 30;  // Frames per second (fps)
+   
+   private ArrayList<Ball> balls;
+   private ArrayList<RedDefender> redDef;
+   private Box box;  // The container rectangular box
+  
+   private DrawCanvas canvas; // Custom canvas for drawing the box/ball
+   private int canvasWidth;
+   private int canvasHeight;
+  
+   /**
+    * Set the drawing canvas to fill the screen (given its width and height).
+    * Initializes balls
+    * @param width : screen width
+    * @param height : screen height
+    */
+   public BoxOfBalls(int width, int height, int numberOfBalls) {
+  
+      canvasWidth = width;
+      canvasHeight = height;
+      balls = new ArrayList(0);
+      redDef = new ArrayList(0);
+      // Initialize the ball at a random location (inside the box) and moveAngle
+         Random randomize = new Random();
+         int radius = 20;
+         int x = randomize.nextInt(canvasWidth - radius * 2 - 20) + radius + 10;
+         int y = randomize.nextInt(canvasHeight - radius * 2 - 20) + radius + 10;
+         int speed = (int)(Math.random()*5+5);
+         int angleInDegree = randomize.nextInt(360);
+         balls.add(new Ball(x, y, radius, speed, angleInDegree));
+      for(int i = 0; i < 3; i++){
+         Random randomize = new Random();
+         int radius = 20;
+         int x = randomize.nextInt(canvasWidth/3 - radius * 2 - 20) + radius + 10;
+         int y = randomize.nextInt(canvasHeight/3 - radius * 2 - 20) + radius + 10;
+         int speed = (int)(Math.random()*5+5);
+         int angleInDegree = randomize.nextInt(360);
+         redDef.add(new RedDefender(x, y, radius, speed, angleInDegree));
+      }
+     
+      // Initialize the Container Box to fill the screen
+      box = new Box(0, 0, canvasWidth, canvasHeight, Color.GREEN, Color.WHITE);
+     
+      // Initialize the custom drawing panel for drawing the game
+      canvas = new DrawCanvas();
+      this.setLayout(new BorderLayout());
+      this.add(canvas, BorderLayout.CENTER);
+      
+      // Handling window resize.
+      this.addComponentListener(new ComponentAdapter() {
+         @Override
+         public void componentResized(ComponentEvent e) {
+            Component c = (Component)e.getSource();
+            Dimension dim = c.getSize();
+            canvasWidth = dim.width;
+            canvasHeight = dim.height;
+            // Adjust the bounds of the container to fill the window
+            box.set(0, 0, canvasWidth, canvasHeight);
+         }
+      });
+  
+      // Start the ball bouncing
+      gameStart();
+   }
+   
+   /** Start the ball bouncing. */
+   public void gameStart() {
+      // Run the game logic in its own thread.
+      Thread gameThread = new Thread() {
+         public void run() {
+            while (true) {
+               gameUpdate();
+               repaint();
+               try {
+                  Thread.sleep(1000 / rate);
+               } catch (InterruptedException ex) {}
+            }
+         }
+      };
+      gameThread.start(); 
+         }
+   
+   //update move
+   public void gameUpdate() {
+      for (int i = 0; i < 3; i++){
+         for (int j = i+1; j < balls.size(); j++){
+            if (Math.pow(balls.get(i).getX() - balls.get(j).getX(), 2) + Math.pow(balls.get(i).getY() - balls.get(j).getY(), 2) <= Math.pow(balls.get(i).getR()+balls.get(j).getR(), 2)){
+               balls.get(i).explosion(balls.get(j).getSpeed());
+               balls.remove(j);
+            }
+         }
+         balls.get(i).move(box);
+      }
+      for (int i = 0; i < 5; i++){
+         for (int j = i+1; j < balls.size(); j++){
+            if (Math.pow(redDef.get(i).getX() - balls.get(j).getX(), 2) + Math.pow(redDef.get(i).getY() - balls.get(j).getY(), 2) <= Math.pow(redDef.get(i).getR()+redDef.get(j).getR(), 2)){
+               balls.remove(j);
+            }
+         }
+         redDef.get(i).move(box);
+      }
+   }
+   
+   class DrawCanvas extends JPanel {
+      @Override
+      public void paintComponent(Graphics g) {
+         super.paintComponent(g);    // Paint background
+         // Draw the box and the ball
+         box.draw(g);
+         for (int b = 0; b < balls.size(); b++) {
+            balls.get(b).draw(g);
+         }
+      }
+        @Override
+      public Dimension getPreferredSize() {
+         return (new Dimension(canvasWidth, canvasHeight));
+      }
+   }
+}
+class Ball {
+   double x, y;
+   double speedX, speedY; 
+   double radius;           
+   private Color color; 
+   double speedFactor; 
+  
+   public Ball(double x, double y, double radius, double speed, double angleInDegree) {
+      this.x = x;
+      this.y = y;
+      // Convert (speed, angle) to (x, y), with y-axis inverted
+      this.speedX = (double)(speed * Math.cos(Math.toRadians(angleInDegree)));
+      this.speedY = (double)(-speed * (double)Math.sin(Math.toRadians(angleInDegree)));
+      this.radius = radius;
+      this.color = Color.WHITE;
+      this.speedFactor = speed;
+   }
+
+   /** Draw itself using the given graphics context. */
+   public void draw(Graphics g) {
+      g.setColor(color);
+      g.fillOval((int)(x - radius), (int)(y - radius), (int)(2 * radius), (int)(2 * radius));
+   }
+   public double getX() {return x;}
+   public double getY() {return y;}
+   public double getR() {return radius;}
+   public double getSpeed() {return speedFactor;}
+   //makes an explosion when balls hit each other
+   public void explosion(double speed)
+   {
+      //transfer of momentum but loss of energy so slower
+      speedFactor+=speed/5;
+      Random randomize = new Random();
+      int angleInDegree = randomize.nextInt(360);
+      this.speedX = (double)(this.speedFactor * Math.cos(Math.toRadians(angleInDegree)));
+      this.speedY = (double)(-this.speedFactor * (double)Math.sin(Math.toRadians(angleInDegree)));
+   }
+      
+   //one iteration of move
+   public void move(Box box) {
+      double ballMinX = box.minX + radius;
+      double ballMinY = box.minY + radius;
+      double ballMaxX = box.maxX - radius;
+      double ballMaxY = box.maxY - radius;
+   
+      // Calculate new position
+      x += speedX;
+      y += speedY;
+      if (x < ballMinX) {
+         speedX = -speedX; // Reflect along normal
+         x = ballMinX;     
+      } else if (x > ballMaxX) {
+      
+         speedX = -speedX;
+         x = ballMaxX;
+      }
+      if (y < ballMinY) {
+         speedY = -speedY;
+         y = ballMinY;
+      } else if (y > ballMaxY) {
+         speedY = -speedY;
+         y = ballMaxY;
+      }  
+   }
+}
+class Player
+{
+   double x, y;
+   double speedX, speedY; 
+   double radius;           
+   private Color color; 
+   double speedFactor; 
+  
+   public Player(double x, double y, double radius, double speed, double angleInDegree) {
+      this.x = x;
+      this.y = y;
+      // Convert (speed, angle) to (x, y), with y-axis inverted
+      this.speedX = (double)(speed * Math.cos(Math.toRadians(angleInDegree)));
+      this.speedY = (double)(-speed * (double)Math.sin(Math.toRadians(angleInDegree)));
+      this.radius = radius;
+      this.color = Color.RED;
+      this.speedFactor = speed;
+   }
+   public void draw(Graphics g) {
+      g.setColor(color);
+      g.fillOval((int)(x - radius), (int)(y - radius), (int)(2 * radius), (int)(2 * radius));
+   }
+   public double getX() {return x;}
+   public double getY() {return y;}
+   public double getR() {return radius;}
+   public double getSpeed() {return speedFactor;}
+   public void move(Box box) {
+      double ballMinX = box.minX + radius;
+      double ballMinY = box.minY + radius;
+      double ballMaxX = box.maxX/3 - radius;
+      double ballMaxY = box.maxY/3 - radius;
+   
+      // Calculate new position
+      x += speedX;
+      y += speedY;
+      if (x < ballMinX) {
+         speedX = -speedX; // Reflect along normal
+         x = ballMinX;     
+      } else if (x > ballMaxX) {
+      
+         speedX = -speedX;
+         x = ballMaxX;
+      }
+      if (y < ballMinY) {
+         speedY = -speedY;
+         y = ballMinY;
+      } else if (y > ballMaxY) {
+         speedY = -speedY;
+         y = ballMaxY;
+      }  
+  
+   }
+}
